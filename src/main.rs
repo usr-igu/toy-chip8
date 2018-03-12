@@ -125,7 +125,7 @@ impl Chip8 {
             0x7000 => {
                 let x = (opcode & 0x0F00) >> 8;
                 let nn = opcode & 0x00FF;
-                self.v[x as usize] += nn as u8;
+                self.v[x as usize] = self.v[x as usize].wrapping_add(nn as u8);
             }
             0x8000 => match opcode & 0x000F {
                 //8XY0 Store the value of register VY in register VX
@@ -185,7 +185,8 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     let y = (opcode & 0x00F0) >> 4;
                     self.v[0x0F] = self.v[y as usize] & 0x1;
-                    self.v[x as usize] = self.v[y as usize] >> 1;
+                    self.v[y as usize] >>= 1;
+                    self.v[x as usize] = self.v[y as usize];
                 }
                 //8XY7 Set register VX to the value of VY minus VX
                 //Set VF to 00 if a borrow occurs
@@ -207,48 +208,85 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     let y = (opcode & 0x00F0) >> 4;
                     self.v[0x0F] = self.v[y as usize] >> 7;
-                    self.v[x as usize] = self.v[y as usize] << 1;
+                    self.v[y as usize] <<= 1;
+                    self.v[x as usize] = self.v[y as usize];
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
+            //9XY0 Skip the following instruction if the value of register VX
+            //is not equal to the value of register VY
+            0x9000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let y = (opcode & 0x00F0) >> 4;
+                if self.v[x as usize] != self.v[y as usize] {
+                    self.pc += 2;
+                }
+            }
+            //ANNN Store memory address NNN in register I
+            0xA000 => {
+                let nnn = opcode & 0x0FFF;
+                self.i = nnn;
+            }
             //DXYN Draw a sprite at position VX, VY with N bytes of sprite data
             //starting at the address stored in I
             //Set VF to 01 if any set pixels are changed to unset, and 00 otherwise
             0xD000 => {
-                let x = ((opcode & 0x0F00) >> 8) as u8;
-                let y = ((opcode & 0x00F0) >> 4) as u8;
-                let n = (opcode & 0x000F) as u8;
+                let x = (opcode & 0x0F00) >> 8;
+                let y = (opcode & 0x00F0) >> 4;
+                let n = opcode & 0x000F;
                 for j in 0..n {
                     let p = self.memory[(self.i + j as u16) as usize];
                     for i in 0..8 {
                         if (p & (128 >> i)) != 0 {
-                            if self.gfx
-                                [(self.v[x as usize] + i + (self.v[y as usize] + j).wrapping_mul(64)) as usize]
-                                == 1
-                            {
-                                self.v[0xF] = 1; // bit flipped
+                            let index = self.v[x as usize] as u16 + i
+                                + (self.v[y as usize] as u16 + j) * 64;
+                            if self.gfx[index as usize] == 1 { // bit flipped
+                                self.v[0xF] = 1; 
                             }
-                            self.gfx[(self.v[x as usize] + i + (self.v[y as usize] + j).wrapping_mul(64))
-                                         as usize] ^= 1;
+                            self.gfx[index as usize] ^= 1;
                         }
                     }
                 }
             }
             0xF000 => match opcode & 0x00FF {
-                0x07 => unimplemented!(),
+                // FX07 Store the current value of the delay timer in register VX
+                0x07 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.v[x as usize] = self.delay_timer;
+                }
                 0x0A => unimplemented!(),
-                0x15 => unimplemented!(),
+                //FX15 Set the delay timer to the value of register VX
+                0x15 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.delay_timer = self.v[x as usize];
+                }
                 0x18 => unimplemented!(),
                 0x1E => unimplemented!(),
                 //FX29 Set I to the memory address of the sprite data corresponding to
                 //the hexadecimal digit stored in register VX
                 0x29 => {
                     let x = (opcode & 0x0F00) >> 8;
-                    self.i = u16::from(self.v[x as usize] * 0x05);
+                    self.i = u16::from(self.v[x as usize]) * 0x05;
                 }
-                0x33 => unimplemented!(),
+                //FX33 	Store the binary-coded decimal equivalent of the value stored
+                //in register VX at addresses I, I+1, and I+2
+                0x33 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.memory[self.i as usize] = self.v[x as usize] / 100;
+                    self.memory[(self.i + 1) as usize] = (self.v[x as usize] / 10) % 10;
+                    self.memory[(self.i + 2) as usize] = (self.v[x as usize] % 100) % 10;
+                }
                 0x55 => unimplemented!(),
-                0x65 => unimplemented!(),
+                //FX65 Fill registers V0 to VX inclusive with the values
+                //stored in memory starting at address I
+                //I is set to I + X + 1 after operation
+                0x65 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    for i in 0..x as usize + 1 {
+                        self.v[i] = self.memory[self.i as usize + i];
+                    }
+                    self.i = self.i + x + 1;
+                }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
             _ => panic!("unknown opcode {:X}", opcode),
@@ -260,7 +298,9 @@ impl Chip8 {
 use std::process::Command;
 
 fn main() {
-    let mut f = File::open("test.ch8").unwrap();
+    // let mut f = File::open("test.ch8").unwrap();
+    let mut f = File::open("GAMES/BREAKOUT").unwrap();
+
     let mut buf = Vec::new();
 
     f.read_to_end(&mut buf).unwrap();
@@ -274,14 +314,14 @@ fn main() {
         for j in 0..32 {
             for i in 0..64 {
                 if chip8.gfx[i + (j * 64)] != 0 {
-                    print!("*");
+                    print!(".");
                 } else {
                     print!(" ");
                 }
             }
             println!();
         }
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // std::thread::sleep(std::time::Duration::from_millis(25));
         let output = Command::new("clear").output().unwrap();
         println!("{}", String::from_utf8_lossy(&output.stdout));
     }
