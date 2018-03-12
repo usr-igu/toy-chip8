@@ -70,7 +70,7 @@ impl Chip8 {
             0x0000 => {
                 match opcode & 0x00FF {
                     //0000 Execute machine language subroutine at address NNN
-                    0x00 => panic!("0x00"), // TODO(fuzzyqu)
+                    // 0x00 => panic!("unknown opcode {:X}", opcode), // TODO(fuzzyqu)
                     //00E0 Clear the screen
                     0xE0 => for i in 0..self.gfx.len() {
                         self.gfx[i] = 0;
@@ -361,13 +361,17 @@ impl Chip8 {
     }
 }
 
-use std::process::Command;
+extern crate sdl2;
 use std::fs::File;
 use std::io::Read;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
 
 fn main() {
     // let mut f = File::open("test.ch8").unwrap();
-    let mut f = File::open("GAMES/TICTAC").unwrap();
+    let mut f = File::open("GAMES/PONG2").unwrap();
 
     let mut buf = Vec::new();
 
@@ -377,20 +381,55 @@ fn main() {
 
     chip8.load_rom(&buf);
 
-    loop {
+    let window_width = 800;
+    let window_height = 600;
+    let block_size = 5;
+
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let window = video_subsystem
+        .window("chip8", window_width, window_height)
+        .position_centered()
+        .build()
+        .unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+    canvas.set_draw_color(Color::RGB(186, 255, 201));
+    canvas.clear();
+    canvas.present();
+    'game_loop: loop {
+        for event in sdl_context.event_pump().unwrap().poll_iter() {
+            match event {
+                Event::KeyDown {
+                    keycode: Some(key), ..
+                } => match key {
+                    Keycode::Escape => {
+                        break 'game_loop;
+                    }
+                    _ => {}
+                },
+                Event::Quit { .. } => break 'game_loop,
+                _ => {}
+            }
+        }
+        canvas.set_draw_color(Color::RGB(186, 255, 201));
+        canvas.clear();
+        canvas.set_draw_color(Color::RGB(255, 179, 186));
         chip8.cycle();
         for j in 0..32 {
             for i in 0..64 {
                 if chip8.gfx[i + (j * 64)] != 0 {
-                    print!(".");
-                } else {
-                    print!(" ");
+                    canvas
+                        .fill_rect(Rect::new(
+                            (i * window_width as usize / 64) as i32,
+                            (j * window_height as usize / 32) as i32,
+                            block_size,
+                            block_size,
+                        ))
+                        .unwrap();
                 }
             }
-            println!();
         }
-        // std::thread::sleep(std::time::Duration::from_millis(25));
-        let output = Command::new("clear").output().unwrap();
-        println!("{}", String::from_utf8_lossy(&output.stdout));
+        canvas.present();
     }
 }
