@@ -66,6 +66,8 @@ impl Chip8 {
 
         println!("opcode: {:X}", opcode);
 
+        self.pc += 2; // go to the next instruction
+
         match opcode & 0xF000 {
             0x0000 => {
                 match opcode & 0x00FF {
@@ -191,13 +193,6 @@ impl Chip8 {
                         self.v[0xF] = 1;
                     }
                     self.v[x as usize] >>= 1;
-                    // TODO(fuzzy): Verificar se é necessário modificar VY.
-                    // let x = (opcode & 0x0F00) >> 8;
-                    // let y = (opcode & 0x00F0) >> 4;
-                    // self.v[0x0F] = self.v[y as usize] & 0x1;
-                    // self.v[y as usize] >>= 1;
-                    // self.v[x as usize] = self.v[y as usize];
-                    // self.v[x as usize] >>= 1;
                 }
                 //8XY7 Set register VX to the value of VY minus VX
                 //Set VF to 00 if a borrow occurs
@@ -222,10 +217,6 @@ impl Chip8 {
                         self.v[0xF] = 1;
                     }
                     self.v[x as usize] <<= 1;
-                    // let y = (opcode & 0x00F0) >> 4;
-                    // self.v[0xF] = self.v[y as usize] >> 7;
-                    // self.v[y as usize] <<= 1;
-                    // self.v[x as usize] = self.v[y as usize];
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
@@ -352,7 +343,6 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     for i in 0..x as usize + 1 {
                         self.memory[self.i as usize + i] = self.v[i];
-                        // self.i += 1;
                     }
                     // self.i = self.i + x + 1;
                 }
@@ -363,7 +353,6 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     for i in 0..x as usize + 1 {
                         self.v[i] = self.memory[self.i as usize + i];
-                        // self.i += 1;
                     }
                     // self.i = self.i + x + 1;
                 }
@@ -378,8 +367,6 @@ impl Chip8 {
         if self.sound_timer > 0 {
             self.sound_timer -= 1;
         }
-
-        self.pc += 2; // go to the next instruction
     }
 }
 
@@ -392,9 +379,9 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
 fn main() {
-    let mut f = File::open("test.ch8").unwrap();
+    // let mut f = File::open("test.ch8").unwrap();
     // let mut f = File::open("GAMES/INVADERS").unwrap();
-    // let mut f = File::open("GAMES/PONG").unwrap();
+    let mut f = File::open("GAMES/BREAKOUT").unwrap();
 
     let mut buf = Vec::new();
 
@@ -578,8 +565,8 @@ fn main() {
                 if chip8.gfx[i + (j * 64)] != 0 {
                     canvas
                         .fill_rect(Rect::new(
-                            (i * window_width as usize / 64) as i32 - block_size as i32,
-                            (j * window_height as usize / 32) as i32 + block_size as i32,
+                            (i * window_width as usize / 64) as i32, // - block_size as i32,
+                            (j * window_height as usize / 32) as i32, //+ block_size as i32,
                             block_size,
                             block_size,
                         ))
@@ -587,6 +574,7 @@ fn main() {
                 }
             }
         }
+        // std::thread::sleep(std::time::Duration::from_millis(13));
         canvas.present();
     }
 }
