@@ -32,7 +32,7 @@ impl Chip8 {
 
     fn load_rom(&mut self, rom: &[u8]) {
         for i in 0..rom.len() {
-            self.memory[512 + i] = rom[i];
+            self.memory[0x200 + i] = rom[i];
         }
     }
 
@@ -58,6 +58,53 @@ impl Chip8 {
                     }
                     _ => panic!("unknown opcode {:x}", opcode),
                 }
+            }
+            //1NNN Jump to address NNN
+            0x1000 => {
+                let nnn = opcode & 0x0FFF;
+                self.pc = nnn;
+            }
+            //2NNN Execute subroutine starting at address NNN
+            0x2000 => {
+                let nnn = opcode & 0x0FFF;
+                self.stack[self.sp as usize] = self.pc;
+                self.pc = nnn;
+            }
+            //3XNN Skip the following instruction if the value of register VX equals NN
+            0x3000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let nn = opcode & 0x00FF;
+                if self.v[x as usize] == nn as u8 {
+                    self.pc += 2;
+                }
+            }
+            //4XNN Skip the following instruction if the value of register VX is not equal to NN
+            0x4000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let nn = opcode & 0x00FF;
+                if self.v[x as usize] != nn as u8 {
+                    self.pc += 2;
+                }
+            }
+            //5XY0 Skip the following instruction if the value of register VX is equal to the value of register VY
+            0x5000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let y = (opcode & 0x00F0) >> 4;
+                if self.v[x as usize] == self.v[y as usize] {
+                    self.pc += 2;
+                }
+            }
+            //6XNN Store number NN in register VX
+            0x6000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let nn = opcode & 0x00FF;
+                self.v[x as usize] = nn as u8;
+            }
+            //7XNN Add the value NN to register VX
+            0x7000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let nn = opcode & 0x00FF;
+                self.v[x as usize] += nn as u8;
             }
             _ => panic!("unknown opcode {:x}", opcode),
         }
