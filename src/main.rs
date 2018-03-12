@@ -13,7 +13,7 @@ struct Chip8 {
     sound_timer: u8,
     keyboard: [u8; 16],
     gfx: [u8; 64 * 32],
-    key_press: bool,
+    key_pressed: bool,
 }
 
 impl Chip8 {
@@ -29,7 +29,7 @@ impl Chip8 {
             sound_timer: 0,
             keyboard: [0; 16],
             gfx: [0; 64 * 32],
-            key_press: false,
+            key_pressed: false,
         };
         let chip8_fontset = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -256,8 +256,8 @@ impl Chip8 {
                     let p = self.memory[(self.i + j as u16) as usize];
                     for i in 0..8 {
                         if (p & (128 >> i)) != 0 {
-                            let index = u16::from(self.v[x as usize]) + i
-                                + (u16::from(self.v[y as usize]) + j) * 64;
+                            let index = (u16::from(self.v[x as usize]) + i
+                                + (u16::from(self.v[y as usize]) + j) * 64) % 2048;
                             if self.gfx[index as usize] == 1 {
                                 // bit flipped
                                 self.v[0xF] = 1;
@@ -295,15 +295,15 @@ impl Chip8 {
                 //FX0A Wait for a keypress and store the result in register VX
                 0x0A => {
                     let x = (opcode & 0x0F00) >> 8;
-                    self.key_press = false;
+                    self.key_pressed = false;
                     for i in 0..self.keyboard.len() {
                         if self.keyboard[i] != 0 {
                             self.v[x as usize] = i as u8;
-                            self.key_press = true;
+                            self.key_pressed = true;
                             break;
                         }
                     }
-                    if !self.key_press {
+                    if !self.key_pressed {
                         return;
                     }
                 }
