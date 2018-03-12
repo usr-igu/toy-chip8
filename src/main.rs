@@ -64,7 +64,7 @@ impl Chip8 {
         let opcode = (u16::from(self.memory[self.pc as usize]) << 8)
             | u16::from(self.memory[self.pc as usize + 1]);
 
-        // println!("opcode: {:X}", opcode);
+        println!("opcode: {:X}", opcode);
 
         match opcode & 0xF000 {
             0x0000 => {
@@ -185,12 +185,19 @@ impl Chip8 {
                 //8XY6 Store the value of register VY shifted right one bit in register VX
                 //Set register VF to the least significant bit prior to the shift
                 0x06 => {
-                    // TODO(fuzzy): Verificar se é necessário modificar VY.
+                    self.v[0xF] = 0;
                     let x = (opcode & 0x0F00) >> 8;
-                    let y = (opcode & 0x00F0) >> 4;
-                    self.v[0x0F] = self.v[y as usize] & 0x1;
-                    self.v[y as usize] >>= 1;
-                    self.v[x as usize] = self.v[y as usize];
+                    if (self.v[x as usize]) & 0x1 == 1 {
+                        self.v[0xF] = 1;
+                    }
+                    self.v[x as usize] >>= 1;
+                    // TODO(fuzzy): Verificar se é necessário modificar VY.
+                    // let x = (opcode & 0x0F00) >> 8;
+                    // let y = (opcode & 0x00F0) >> 4;
+                    // self.v[0x0F] = self.v[y as usize] & 0x1;
+                    // self.v[y as usize] >>= 1;
+                    // self.v[x as usize] = self.v[y as usize];
+                    // self.v[x as usize] >>= 1;
                 }
                 //8XY7 Set register VX to the value of VY minus VX
                 //Set VF to 00 if a borrow occurs
@@ -209,11 +216,16 @@ impl Chip8 {
                 //Set register VF to the most significant bit prior to the shift
                 0x0E => {
                     // TODO(fuzzy): Verificar se é necessário modificar VY.
+                    self.v[0xF] = 0;
                     let x = (opcode & 0x0F00) >> 8;
-                    let y = (opcode & 0x00F0) >> 4;
-                    self.v[0x0F] = self.v[y as usize] >> 7;
-                    self.v[y as usize] <<= 1;
-                    self.v[x as usize] = self.v[y as usize];
+                    if (self.v[x as usize] >> 7) & 0x1 == 1 {
+                        self.v[0xF] = 1;
+                    }
+                    self.v[x as usize] <<= 1;
+                    // let y = (opcode & 0x00F0) >> 4;
+                    // self.v[0xF] = self.v[y as usize] >> 7;
+                    // self.v[y as usize] <<= 1;
+                    // self.v[x as usize] = self.v[y as usize];
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
@@ -340,8 +352,9 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     for i in 0..x as usize + 1 {
                         self.memory[self.i as usize + i] = self.v[i];
+                        // self.i += 1;
                     }
-                    self.i = self.i + x + 1;
+                    // self.i = self.i + x + 1;
                 }
                 //FX65 Fill registers V0 to VX inclusive with the values
                 //stored in memory starting at address I
@@ -350,13 +363,22 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     for i in 0..x as usize + 1 {
                         self.v[i] = self.memory[self.i as usize + i];
+                        // self.i += 1;
                     }
-                    self.i = self.i + x + 1;
+                    // self.i = self.i + x + 1;
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
             _ => panic!("unknown opcode {:X}", opcode),
         }
+
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+        }
+
         self.pc += 2; // go to the next instruction
     }
 }
@@ -370,8 +392,9 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
 fn main() {
-    // let mut f = File::open("test.ch8").unwrap();
-    let mut f = File::open("GAMES/PONG2").unwrap();
+    let mut f = File::open("test.ch8").unwrap();
+    // let mut f = File::open("GAMES/INVADERS").unwrap();
+    // let mut f = File::open("GAMES/PONG").unwrap();
 
     let mut buf = Vec::new();
 
@@ -383,7 +406,7 @@ fn main() {
 
     let window_width = 800;
     let window_height = 600;
-    let block_size = 5;
+    let block_size = 20u32;
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -394,6 +417,7 @@ fn main() {
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
+
     canvas.set_draw_color(Color::RGB(186, 255, 201));
     canvas.clear();
     canvas.present();
@@ -405,6 +429,139 @@ fn main() {
                 } => match key {
                     Keycode::Escape => {
                         break 'game_loop;
+                    }
+                    Keycode::Num1 => {
+                        chip8.keyboard[0x1] = 1;
+                        println!("key down 1 (2)")
+                    }
+                    Keycode::Num2 => {
+                        chip8.keyboard[0x2] = 1;
+                        println!("key down 2 (2)")
+                    }
+                    Keycode::Num3 => {
+                        chip8.keyboard[0x3] = 1;
+                        println!("key down 3 (3)")
+                    }
+                    Keycode::Num4 => {
+                        chip8.keyboard[0xC] = 1;
+                        println!("key down 4 (C)")
+                    }
+                    Keycode::Q => {
+                        chip8.keyboard[0x4] = 1;
+                        println!("key down Q (4)")
+                    }
+                    Keycode::W => {
+                        chip8.keyboard[0x5] = 1;
+                        println!("key down W (5)")
+                    }
+                    Keycode::E => {
+                        chip8.keyboard[0x6] = 1;
+                        println!("key down E (6)")
+                    }
+                    Keycode::R => {
+                        chip8.keyboard[0xD] = 1;
+                        println!("key down R (D)")
+                    }
+                    Keycode::A => {
+                        chip8.keyboard[0x7] = 1;
+                        println!("key down A (7)")
+                    }
+                    Keycode::S => {
+                        chip8.keyboard[0x8] = 1;
+                        println!("key down S (8)")
+                    }
+                    Keycode::D => {
+                        chip8.keyboard[0x9] = 1;
+                        println!("key down D (9)")
+                    }
+                    Keycode::F => {
+                        chip8.keyboard[0xE] = 1;
+                        println!("key down F (E)")
+                    }
+                    Keycode::Z => {
+                        chip8.keyboard[0xA] = 1;
+                        println!("key down Z (A)")
+                    }
+                    Keycode::X => {
+                        chip8.keyboard[0x0] = 1;
+                        println!("key down X (0)")
+                    }
+                    Keycode::C => {
+                        chip8.keyboard[0xB] = 1;
+                        println!("key down C (B)")
+                    }
+                    Keycode::V => {
+                        chip8.keyboard[0xF] = 1;
+                        println!("key down V (F)")
+                    }
+                    _ => {}
+                },
+                Event::KeyUp {
+                    keycode: Some(key), ..
+                } => match key {
+                    Keycode::Num1 => {
+                        chip8.keyboard[0x1] = 0;
+                        println!("key up 1 (2)")
+                    }
+                    Keycode::Num2 => {
+                        chip8.keyboard[0x2] = 0;
+                        println!("key up 2 (2)")
+                    }
+                    Keycode::Num3 => {
+                        chip8.keyboard[0x3] = 0;
+                        println!("key up 3 (3)")
+                    }
+                    Keycode::Num4 => {
+                        chip8.keyboard[0xC] = 0;
+                        println!("key up 4 (C)")
+                    }
+                    Keycode::Q => {
+                        chip8.keyboard[0x4] = 0;
+                        println!("key up Q (4)")
+                    }
+                    Keycode::W => {
+                        chip8.keyboard[0x5] = 0;
+                        println!("key up W (5)")
+                    }
+                    Keycode::E => {
+                        chip8.keyboard[0x6] = 0;
+                        println!("key up E (6)")
+                    }
+                    Keycode::R => {
+                        chip8.keyboard[0xD] = 0;
+                        println!("key up R (D)")
+                    }
+                    Keycode::A => {
+                        chip8.keyboard[0x7] = 0;
+                        println!("key up A (7)")
+                    }
+                    Keycode::S => {
+                        chip8.keyboard[0x8] = 0;
+                        println!("key up S (8)")
+                    }
+                    Keycode::D => {
+                        chip8.keyboard[0x9] = 0;
+                        println!("key up D (9)")
+                    }
+                    Keycode::F => {
+                        chip8.keyboard[0xE] = 0;
+                        println!("key up F (E)")
+                    }
+                    Keycode::Z => {
+                        chip8.keyboard[0xA] = 0;
+                        println!("key up Z (A)")
+                    }
+                    Keycode::X => {
+                        chip8.keyboard[0x0] = 0;
+                        println!("key up X (0)")
+                    }
+                    Keycode::C => {
+                        chip8.keyboard[0xB] = 0;
+                        println!("key up C (B)")
+                    }
+                    Keycode::V => {
+                        chip8.keyboard[0xF] = 0;
+                        println!("key down V (F)")
                     }
                     _ => {}
                 },
@@ -421,8 +578,8 @@ fn main() {
                 if chip8.gfx[i + (j * 64)] != 0 {
                     canvas
                         .fill_rect(Rect::new(
-                            (i * window_width as usize / 64) as i32,
-                            (j * window_height as usize / 32) as i32,
+                            (i * window_width as usize / 64) as i32 - block_size as i32,
+                            (j * window_height as usize / 32) as i32 + block_size as i32,
                             block_size,
                             block_size,
                         ))
