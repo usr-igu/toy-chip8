@@ -56,7 +56,7 @@ impl Chip8 {
                         self.pc = self.stack[self.sp as usize]; // return from the routine
                         self.sp -= 1; // go down the stack
                     }
-                    _ => panic!("unknown opcode {:x}", opcode),
+                    _ => panic!("unknown opcode {:X}", opcode),
                 }
             }
             //1NNN Jump to address NNN
@@ -106,7 +106,91 @@ impl Chip8 {
                 let nn = opcode & 0x00FF;
                 self.v[x as usize] += nn as u8;
             }
-            _ => panic!("unknown opcode {:x}", opcode),
+            0x8000 => match opcode & 0x000F {
+                //8XY0 Store the value of register VY in register VX
+                0x0 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[x as usize] = self.v[y as usize];
+                }
+                //8XY1 Set VX to VX OR VY
+                0x1 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[x as usize] |= self.v[y as usize];
+                }
+                //8XY2 Set VX to VX AND VY
+                0x2 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[x as usize] &= self.v[y as usize];
+                }
+                //8XY3 Set VX to VX XOR VY
+                0x3 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[x as usize] ^= self.v[y as usize];
+                }
+                //8XY4 Add the value of register VY to register VX
+                //Set VF to 01 if a carry occurs
+                //Set VF to 00 if a carry does not occur
+                0x04 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[0xF] = 0;
+                    let (sum, carry) = self.v[x as usize].overflowing_add(self.v[y as usize]);
+                    if carry {
+                        self.v[0xF] = 1
+                    };
+                    self.v[x as usize] = sum;
+                }
+                //8XY5 Subtract the value of register VY from register VX
+                //Set VF to 00 if a borrow occurs
+                //Set VF to 01 if a borrow does not occur
+                0x05 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[0xF] = 1;
+                    let (sub, borrow) = self.v[x as usize].overflowing_sub(self.v[y as usize]);
+                    if borrow {
+                        self.v[0xF] = 0
+                    };
+                    self.v[x as usize] = sub;
+                }
+                //8XY6 Store the value of register VY shifted right one bit in register VX
+                //Set register VF to the least significant bit prior to the shift
+                0x06 => {
+                    // TODO(fuzzy): Verificar se é necessário modificar VY.
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[0x0F] = self.v[y as usize] & 0x1;
+                    self.v[x as usize] = self.v[y as usize] >> 1;
+                }
+                //8XY7 Set register VX to the value of VY minus VX
+                //Set VF to 00 if a borrow occurs
+                //Set VF to 01 if a borrow does not occur
+                0x07 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[0xF] = 1;
+                    let (sub, borrow) = self.v[y as usize].overflowing_sub(self.v[x as usize]);
+                    if borrow {
+                        self.v[0xF] = 0
+                    };
+                    self.v[x as usize] = sub;
+                }
+                //8XYE Store the value of register VY shifted left one bit in register VX
+                //Set register VF to the most significant bit prior to the shift
+                0x0E => {
+                    // TODO(fuzzy): Verificar se é necessário modificar VY.
+                    let x = (opcode & 0x0F00) >> 8;
+                    let y = (opcode & 0x00F0) >> 4;
+                    self.v[0x0F] = self.v[y as usize] >> 7;
+                    self.v[x as usize] = self.v[y as usize] << 1;
+                }
+                _ => panic!("unknown opcode {:X}", opcode),
+            },
+            _ => panic!("unknown opcode {:X}", opcode),
         }
         self.pc += 2; // go to the next instruction
     }
