@@ -1,5 +1,6 @@
-use std::fs::File;
-use std::io::Read;
+extern crate rand;
+
+use rand::Rng;
 
 struct Chip8 {
     memory: [u8; 4096],
@@ -12,6 +13,7 @@ struct Chip8 {
     sound_timer: u8,
     keyboard: [u8; 16],
     gfx: [u8; 64 * 32],
+    key_press: bool,
 }
 
 impl Chip8 {
@@ -27,6 +29,7 @@ impl Chip8 {
             sound_timer: 0,
             keyboard: [0; 16],
             gfx: [0; 64 * 32],
+            key_press: false,
         };
         let chip8_fontset = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -61,7 +64,7 @@ impl Chip8 {
         let opcode = (u16::from(self.memory[self.pc as usize]) << 8)
             | u16::from(self.memory[self.pc as usize + 1]);
 
-        println!("opcode: {:X}", opcode);
+        // println!("opcode: {:X}", opcode);
 
         match opcode & 0xF000 {
             0x0000 => {
@@ -74,8 +77,8 @@ impl Chip8 {
                     },
                     //00EE Return from a subroutine
                     0xEE => {
-                        self.pc = self.stack[self.sp as usize]; // return from the routine
                         self.sp -= 1; // go down the stack
+                        self.pc = self.stack[self.sp as usize]; // return from the routine
                     }
                     _ => panic!("unknown opcode {:X}", opcode),
                 }
@@ -89,6 +92,7 @@ impl Chip8 {
             0x2000 => {
                 let nnn = opcode & 0x0FFF;
                 self.stack[self.sp as usize] = self.pc;
+                self.sp += 1;
                 self.pc = nnn;
             }
             //3XNN Skip the following instruction if the value of register VX equals NN
@@ -227,6 +231,17 @@ impl Chip8 {
                 let nnn = opcode & 0x0FFF;
                 self.i = nnn;
             }
+            //BNNN Jump to address NNN + V0
+            0xB000 => {
+                let nnn = opcode & 0x0FFF;
+                self.pc = nnn + self.v[0x0] as u16;
+            }
+            //CXNN Set VX to a random number with a mask of NN
+            0xC000 => {
+                let x = (opcode & 0x0F00) >> 8;
+                let nn = opcode & 0x00FF;
+                self.v[x as usize] = rand::thread_rng().gen::<u8>() & nn as u8;
+            }
             //DXYN Draw a sprite at position VX, VY with N bytes of sprite data
             //starting at the address stored in I
             //Set VF to 01 if any set pixels are changed to unset, and 00 otherwise
@@ -240,8 +255,9 @@ impl Chip8 {
                         if (p & (128 >> i)) != 0 {
                             let index = self.v[x as usize] as u16 + i
                                 + (self.v[y as usize] as u16 + j) * 64;
-                            if self.gfx[index as usize] == 1 { // bit flipped
-                                self.v[0xF] = 1; 
+                            if self.gfx[index as usize] == 1 {
+                                // bit flipped
+                                self.v[0xF] = 1;
                             }
                             self.gfx[index as usize] ^= 1;
                         }
@@ -254,14 +270,36 @@ impl Chip8 {
                     let x = (opcode & 0x0F00) >> 8;
                     self.v[x as usize] = self.delay_timer;
                 }
-                0x0A => unimplemented!(),
+                //FX0A Wait for a keypress and store the result in register VX
+                0x0A => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.key_press = false;
+                    for i in 0..self.keyboard.len() {
+                        if self.keyboard[i] != 0 {
+                            self.v[x as usize] = i as u8;
+                            self.key_press = true;
+                            break;
+                        }
+                    }
+                    if !self.key_press {
+                        return;
+                    }
+                }
                 //FX15 Set the delay timer to the value of register VX
                 0x15 => {
                     let x = (opcode & 0x0F00) >> 8;
                     self.delay_timer = self.v[x as usize];
                 }
-                0x18 => unimplemented!(),
-                0x1E => unimplemented!(),
+                //FX18 Set the sound timer to the value of register VX
+                0x18 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.sound_timer = self.v[x as usize];
+                }
+                //FX1E Add the value stored in register VX to register I
+                0x1E => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.i += self.v[x as usize] as u16;
+                }
                 //FX29 Set I to the memory address of the sprite data corresponding to
                 //the hexadecimal digit stored in register VX
                 0x29 => {
@@ -276,7 +314,15 @@ impl Chip8 {
                     self.memory[(self.i + 1) as usize] = (self.v[x as usize] / 10) % 10;
                     self.memory[(self.i + 2) as usize] = (self.v[x as usize] % 100) % 10;
                 }
-                0x55 => unimplemented!(),
+                //FX55 Store the values of registers V0 to VX inclusive in memory starting at address I
+                //I is set to I + X + 1 after operation
+                0x55 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    for i in 0..x as usize + 1 {
+                        self.memory[self.i as usize + i] = self.v[i];
+                    }
+                    self.i = self.i + x + 1;
+                }
                 //FX65 Fill registers V0 to VX inclusive with the values
                 //stored in memory starting at address I
                 //I is set to I + X + 1 after operation
@@ -295,11 +341,13 @@ impl Chip8 {
     }
 }
 
-use std::process::Command;
+// use std::process::Command;
+use std::fs::File;
+use std::io::Read;
 
 fn main() {
     // let mut f = File::open("test.ch8").unwrap();
-    let mut f = File::open("GAMES/BREAKOUT").unwrap();
+    let mut f = File::open("GAMES/TICTAC").unwrap();
 
     let mut buf = Vec::new();
 
@@ -311,18 +359,18 @@ fn main() {
 
     loop {
         chip8.cycle();
-        for j in 0..32 {
-            for i in 0..64 {
-                if chip8.gfx[i + (j * 64)] != 0 {
-                    print!(".");
-                } else {
-                    print!(" ");
-                }
-            }
-            println!();
-        }
-        // std::thread::sleep(std::time::Duration::from_millis(25));
-        let output = Command::new("clear").output().unwrap();
-        println!("{}", String::from_utf8_lossy(&output.stdout));
+        // for j in 0..32 {
+        //     for i in 0..64 {
+        //         if chip8.gfx[i + (j * 64)] != 0 {
+        //             print!(".");
+        //         } else {
+        //             print!(" ");
+        //         }
+        //     }
+        //     println!();
+        // }
+        // // std::thread::sleep(std::time::Duration::from_millis(25));
+        // let output = Command::new("clear").output().unwrap();
+        // println!("{}", String::from_utf8_lossy(&output.stdout));
     }
 }
