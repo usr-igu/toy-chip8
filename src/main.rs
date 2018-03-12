@@ -249,6 +249,7 @@ impl Chip8 {
                 let x = (opcode & 0x0F00) >> 8;
                 let y = (opcode & 0x00F0) >> 4;
                 let n = opcode & 0x000F;
+                self.v[0xF] = 0;
                 for j in 0..n {
                     let p = self.memory[(self.i + j as u16) as usize];
                     for i in 0..8 {
@@ -264,6 +265,25 @@ impl Chip8 {
                     }
                 }
             }
+            0xE000 => match opcode & 0x00FF {
+                //EX9E Skip the following instruction if the key corresponding to
+                //the hex value currently stored in register VX is pressed
+                0x9E => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    if self.keyboard[self.v[x as usize] as usize] != 0 {
+                        self.pc += 2;
+                    }
+                }
+                //EXA1 Skip the following instruction if the key corresponding
+                //to the hex value currently stored in register VX is not pressed
+                0xA1 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    if self.keyboard[self.v[x as usize] as usize] == 0 {
+                        self.pc += 2;
+                    }
+                }
+                _ => panic!("unknown opcode {:X}", opcode),
+            },
             0xF000 => match opcode & 0x00FF {
                 // FX07 Store the current value of the delay timer in register VX
                 0x07 => {
@@ -341,7 +361,7 @@ impl Chip8 {
     }
 }
 
-// use std::process::Command;
+use std::process::Command;
 use std::fs::File;
 use std::io::Read;
 
@@ -359,18 +379,18 @@ fn main() {
 
     loop {
         chip8.cycle();
-        // for j in 0..32 {
-        //     for i in 0..64 {
-        //         if chip8.gfx[i + (j * 64)] != 0 {
-        //             print!(".");
-        //         } else {
-        //             print!(" ");
-        //         }
-        //     }
-        //     println!();
-        // }
-        // // std::thread::sleep(std::time::Duration::from_millis(25));
-        // let output = Command::new("clear").output().unwrap();
-        // println!("{}", String::from_utf8_lossy(&output.stdout));
+        for j in 0..32 {
+            for i in 0..64 {
+                if chip8.gfx[i + (j * 64)] != 0 {
+                    print!(".");
+                } else {
+                    print!(" ");
+                }
+            }
+            println!();
+        }
+        // std::thread::sleep(std::time::Duration::from_millis(25));
+        let output = Command::new("clear").output().unwrap();
+        println!("{}", String::from_utf8_lossy(&output.stdout));
     }
 }
