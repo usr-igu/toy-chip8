@@ -6,6 +6,7 @@ struct Chip8 {
     v: [u8; 16], // registers
     i: u16,      // address register
     pc: u16,     // program counter
+    sp: u8,      // stack pointer
     stack: [u16; 16],
     delay_timer: u8,
     sound_timer: u8,
@@ -20,6 +21,7 @@ impl Chip8 {
             v: [0; 16],
             i: 0,
             pc: 0x200, // chip 8 programs start at position 512
+            sp: 0,
             stack: [0; 16],
             delay_timer: 0,
             sound_timer: 0,
@@ -41,6 +43,22 @@ impl Chip8 {
         println!("opcode: {:X}", opcode);
 
         match opcode & 0xF000 {
+            0x0000 => {
+                match opcode & 0x00FF {
+                    //0000 Execute machine language subroutine at address NNN
+                    0x00 => panic!("0x00"), // TODO(fuzzyqu)
+                    //00E0 Clear the screen
+                    0xE0 => for i in 0..self.gfx.len() {
+                        self.gfx[i] = 0;
+                    },
+                    //00EE Return from a subroutine
+                    0xEE => {
+                        self.pc = self.stack[self.sp as usize]; // return from the routine
+                        self.sp -= 1; // go down the stack
+                    }
+                    _ => panic!("unknown opcode {:x}", opcode),
+                }
+            }
             _ => panic!("unknown opcode {:x}", opcode),
         }
         self.pc += 2; // go to the next instruction
