@@ -16,7 +16,7 @@ struct Chip8 {
 
 impl Chip8 {
     fn new() -> Self {
-        Chip8 {
+        let mut chip8 = Chip8 {
             memory: [0; 4096],
             v: [0; 16],
             i: 0,
@@ -27,7 +27,28 @@ impl Chip8 {
             sound_timer: 0,
             keyboard: [0; 16],
             gfx: [0; 64 * 32],
+        };
+        let chip8_fontset = [
+            0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+            0x20, 0x60, 0x20, 0x20, 0x70, //1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+            0x90, 0x90, 0xF0, 0x10, 0x10, //4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+            0xF0, 0x10, 0x20, 0x40, 0x40, //7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, //A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, //C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, //D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
+            0xF0, 0x80, 0xF0, 0x80, 0x80]; //F
+        for i in 0..chip8_fontset.len() {
+            chip8.memory[i] = chip8_fontset[i];
         }
+        chip8
     }
 
     fn load_rom(&mut self, rom: &[u8]) {
@@ -190,11 +211,53 @@ impl Chip8 {
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
+            //DXYN Draw a sprite at position VX, VY with N bytes of sprite data
+            //starting at the address stored in I
+            //Set VF to 01 if any set pixels are changed to unset, and 00 otherwise
+            0xD000 => {
+                let x = ((opcode & 0x0F00) >> 8) as u8;
+                let y = ((opcode & 0x00F0) >> 4) as u8;
+                let n = (opcode & 0x000F) as u8;
+                for j in 0..n {
+                    let p = self.memory[(self.i + j as u16) as usize];
+                    for i in 0..8 {
+                        if (p & (128 >> i)) != 0 {
+                            if self.gfx
+                                [(self.v[x as usize] + i + (self.v[y as usize] + j).wrapping_mul(64)) as usize]
+                                == 1
+                            {
+                                self.v[0xF] = 1; // bit flipped
+                            }
+                            self.gfx[(self.v[x as usize] + i + (self.v[y as usize] + j).wrapping_mul(64))
+                                         as usize] ^= 1;
+                        }
+                    }
+                }
+            }
+            0xF000 => match opcode & 0x00FF {
+                0x07 => unimplemented!(),
+                0x0A => unimplemented!(),
+                0x15 => unimplemented!(),
+                0x18 => unimplemented!(),
+                0x1E => unimplemented!(),
+                //FX29 Set I to the memory address of the sprite data corresponding to
+                //the hexadecimal digit stored in register VX
+                0x29 => {
+                    let x = (opcode & 0x0F00) >> 8;
+                    self.i = u16::from(self.v[x as usize] * 0x05);
+                }
+                0x33 => unimplemented!(),
+                0x55 => unimplemented!(),
+                0x65 => unimplemented!(),
+                _ => panic!("unknown opcode {:X}", opcode),
+            },
             _ => panic!("unknown opcode {:X}", opcode),
         }
         self.pc += 2; // go to the next instruction
     }
 }
+
+use std::process::Command;
 
 fn main() {
     let mut f = File::open("test.ch8").unwrap();
@@ -208,5 +271,18 @@ fn main() {
 
     loop {
         chip8.cycle();
+        for j in 0..32 {
+            for i in 0..64 {
+                if chip8.gfx[i + (j * 64)] != 0 {
+                    print!("*");
+                } else {
+                    print!(" ");
+                }
+            }
+            println!();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let output = Command::new("clear").output().unwrap();
+        println!("{}", String::from_utf8_lossy(&output.stdout));
     }
 }
