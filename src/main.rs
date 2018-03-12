@@ -48,16 +48,15 @@ impl Chip8 {
             0xE0, 0x90, 0x90, 0x90, 0xE0, //D
             0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
             0xF0, 0x80, 0xF0, 0x80, 0x80]; //F
-        for i in 0..chip8_fontset.len() {
-            chip8.memory[i] = chip8_fontset[i];
-        }
+
+        // load fontset
+        chip8.memory[..chip8_fontset.len()].clone_from_slice(&chip8_fontset[..]);
+
         chip8
     }
 
     fn load_rom(&mut self, rom: &[u8]) {
-        for i in 0..rom.len() {
-            self.memory[0x200 + i] = rom[i];
-        }
+        self.memory[512..(rom.len() + 512)].clone_from_slice(&rom[..]);
     }
 
     fn cycle(&mut self) {
@@ -237,7 +236,7 @@ impl Chip8 {
             //BNNN Jump to address NNN + V0
             0xB000 => {
                 let nnn = opcode & 0x0FFF;
-                self.pc = nnn + self.v[0x0] as u16;
+                self.pc = nnn + u16::from(self.v[0x0]);
             }
             //CXNN Set VX to a random number with a mask of NN
             0xC000 => {
@@ -257,8 +256,8 @@ impl Chip8 {
                     let p = self.memory[(self.i + j as u16) as usize];
                     for i in 0..8 {
                         if (p & (128 >> i)) != 0 {
-                            let index = self.v[x as usize] as u16 + i
-                                + (self.v[y as usize] as u16 + j) * 64;
+                            let index = u16::from(self.v[x as usize]) + i
+                                + (u16::from(self.v[y as usize]) + j) * 64;
                             if self.gfx[index as usize] == 1 {
                                 // bit flipped
                                 self.v[0xF] = 1;
@@ -321,7 +320,7 @@ impl Chip8 {
                 //FX1E Add the value stored in register VX to register I
                 0x1E => {
                     let x = (opcode & 0x0F00) >> 8;
-                    self.i += self.v[x as usize] as u16;
+                    self.i += u16::from(self.v[x as usize]);
                 }
                 //FX29 Set I to the memory address of the sprite data corresponding to
                 //the hexadecimal digit stored in register VX
@@ -377,7 +376,6 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-
 fn main() {
     // let mut f = File::open("test.ch8").unwrap();
     // let mut f = File::open("GAMES/INVADERS").unwrap();
