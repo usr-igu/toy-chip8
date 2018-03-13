@@ -21,7 +21,7 @@ impl AudioCallback for SoundWave {
     type Channel = f32;
     fn callback(&mut self, out: &mut [f32]) {
         for x in out.iter_mut() {
-            *x = if self.phase <= 0.5 {
+            *x = if self.phase <= 0.55 {
                 self.volume
             } else {
                 -self.volume
@@ -47,12 +47,12 @@ fn main() {
 
     chip.load_rom(&buf);
 
-    let window_width = 64 * 10;
-    let window_height = 32 * 10;
-    let block_size = 10u32;
+    let window_width = 64 * 15;
+    let window_height = 32 * 15;
+    let block_size = 15u32;
 
-    let background_color = Color::RGB(186, 255, 201);
-    let block_color = Color::RGB(255, 179, 186);
+    let background_color = Color::RGB(59, 89, 152);
+    let block_color = Color::RGB(247, 247, 247);
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -70,9 +70,9 @@ fn main() {
     };
     let device = audio_subsystem
         .open_playback(None, &desired_spec, |spec| SoundWave {
-            phase_inc: 50.0 / spec.freq as f32,
+            phase_inc: 60.0 / spec.freq as f32,
             phase: 0.5,
-            volume: 0.15,
+            volume: 0.25,
         })
         .unwrap();
 
