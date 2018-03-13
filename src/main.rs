@@ -5,8 +5,29 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
 
 mod chip8;
+
+struct SoundWave {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32,
+}
+
+impl AudioCallback for SoundWave {
+    type Channel = f32;
+    fn callback(&mut self, out: &mut [f32]) {
+        for x in out.iter_mut() {
+            *x = if self.phase <= 0.5 {
+                self.volume
+            } else {
+                -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
+    }
+}
 
 fn main() {
     let rom_path = match std::env::args().nth(1) {
@@ -37,6 +58,20 @@ fn main() {
         .window("chip8 interpreter", window_width, window_height)
         .position_centered()
         .build()
+        .unwrap();
+
+    let audio_subsystem = sdl_context.audio().unwrap();
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(2),
+        samples: None,
+    };
+    let device = audio_subsystem
+        .open_playback(None, &desired_spec, |spec| SoundWave {
+            phase_inc: 50.0 / spec.freq as f32,
+            phase: 0.5,
+            volume: 0.15,
+        })
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
@@ -180,6 +215,12 @@ fn main() {
         if timers_ticks > timers_tickrate {
             chip.timers_tick();
             timers_past = timers_now;
+        }
+
+        if chip.sound_flag {
+            device.resume();
+        } else {
+            device.pause();
         }
 
         if chip.draw_flag {

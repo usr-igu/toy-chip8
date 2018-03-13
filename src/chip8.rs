@@ -14,6 +14,7 @@ pub struct Cpu {
     pub gfx: [u8; 64 * 32],
     pub key_pressed: bool,
     pub draw_flag: bool,
+    pub sound_flag: bool,
     load_store_quirk: bool,
     shift_quirk: bool,
 }
@@ -32,8 +33,9 @@ pub fn new() -> Cpu {
         gfx: [0; 64 * 32],
         key_pressed: false,
         draw_flag: false,
-        load_store_quirk: true,
-        shift_quirk: true,
+        sound_flag: false,
+        load_store_quirk: false,
+        shift_quirk: false,
     };
     let chip8_fontset = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -69,6 +71,12 @@ impl Cpu {
         self.pc += 2; // go to the next instruction
 
         self.draw_flag = false;
+
+        if self.sound_timer > 0 {
+            self.sound_flag = true;
+        } else {
+            self.sound_flag = false;
+        }
 
         let x = (opcode & 0x0F00) >> 8;
         let y = (opcode & 0x00F0) >> 4;
@@ -246,10 +254,11 @@ impl Cpu {
                                 self.v[0xF] = 1;
                             }
                             self.gfx[index as usize] ^= 1;
+                            self.draw_flag = true;
                         }
                     }
                 }
-                self.draw_flag = true;
+                // self.draw_flag = true;
             }
             0xE000 => match opcode & 0x00FF {
                 //EX9E Skip the following instruction if the key corresponding to
