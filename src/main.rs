@@ -34,20 +34,24 @@ fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("chirp8", window_width, window_height)
+        .window("chip8 interpreter", window_width, window_height)
         .position_centered()
         .build()
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    let mut old = std::time::Instant::now();
+    let mut timers_past = std::time::Instant::now();
+    let mut cpu_past = std::time::Instant::now();
 
-    let clock_tick = std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64); // 60hz
+    let timers_tickrate =
+        std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64); // 60hz
 
-    canvas.set_draw_color(background_color);
-    canvas.clear();
-    canvas.present();
+    let cpu_tickrate = std::time::Duration::from_millis(f64::floor((1.0 / 500.0) * 1000.0) as u64);
+
+    // canvas.set_draw_color(background_color);
+    // canvas.clear();
+    // canvas.present();
     'game_loop: loop {
         for event in sdl_context.event_pump().unwrap().poll_iter() {
             match event {
@@ -165,14 +169,20 @@ fn main() {
             }
         }
 
-        let new = std::time::Instant::now();
+        let timers_now = std::time::Instant::now();
+        let cpu_now = std::time::Instant::now();
 
-        let tick = new - old;
+        let timers_ticks = timers_now - timers_past;
+        let cpu_ticks = cpu_now - cpu_past;
 
-        // 60hz
-        if tick > clock_tick {
-            chip.cycle();
-            old = new;
+        if cpu_ticks > cpu_tickrate {
+            chip.cpu_tick();
+            cpu_past = cpu_now;
+        }
+
+        if timers_ticks > timers_tickrate {
+            chip.timers_tick();
+            timers_past = timers_now;
         }
 
         if chip.draw_flag {

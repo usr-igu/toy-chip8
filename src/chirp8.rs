@@ -58,7 +58,7 @@ impl Cpu {
         self.memory[512..(rom.len() + 512)].clone_from_slice(&rom[..]);
     }
 
-    pub fn cycle(&mut self) {
+    pub fn cpu_tick(&mut self) {
         let opcode = (u16::from(self.memory[self.pc as usize]) << 8)
             | u16::from(self.memory[self.pc as usize + 1]);
 
@@ -363,12 +363,6 @@ impl Cpu {
             },
             _ => panic!("unknown opcode {:X}", opcode),
         }
-        if self.delay_timer > 0 {
-            self.delay_timer -= 1;
-        }
-        if self.sound_timer > 0 {
-            self.sound_timer -= 1;
-        }
     }
 
     pub fn key_down(&mut self, key: u8) {
@@ -377,5 +371,14 @@ impl Cpu {
 
     pub fn key_up(&mut self, key: u8) {
         self.keyboard[key as usize] = 0;
+    }
+
+    pub fn timers_tick(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+        }
     }
 }
