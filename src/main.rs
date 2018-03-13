@@ -1,6 +1,8 @@
 extern crate sdl2;
 use std::fs::File;
 use std::io::Read;
+use std::collections::HashMap;
+
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -76,126 +78,52 @@ fn main() {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    let mut timers_past = std::time::Instant::now();
-    let mut cpu_past = std::time::Instant::now();
-
     let timers_tickrate =
         std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64); // 60hz
 
     let cpu_tickrate = std::time::Duration::from_millis(f64::floor((1.0 / 500.0) * 1000.0) as u64);
+
+    let mut timers_past = std::time::Instant::now();
+    let mut cpu_past = std::time::Instant::now();
+
+    let mut keys = HashMap::new();
+    keys.insert(Keycode::Num1, 0x1);
+    keys.insert(Keycode::Num2, 0x2);
+    keys.insert(Keycode::Num3, 0x3);
+    keys.insert(Keycode::Num4, 0xC);
+    keys.insert(Keycode::Q, 0x4);
+    keys.insert(Keycode::W, 0x5);
+    keys.insert(Keycode::E, 0x6);
+    keys.insert(Keycode::R, 0xD);
+    keys.insert(Keycode::A, 0x7);
+    keys.insert(Keycode::S, 0x8);
+    keys.insert(Keycode::D, 0x9);
+    keys.insert(Keycode::F, 0xE);
+    keys.insert(Keycode::Z, 0xA);
+    keys.insert(Keycode::X, 0x0);
+    keys.insert(Keycode::C, 0xB);
+    keys.insert(Keycode::V, 0xF);
 
     'game_loop: loop {
         for event in sdl_context.event_pump().unwrap().poll_iter() {
             match event {
                 Event::KeyDown {
                     keycode: Some(key), ..
-                } => match key {
-                    Keycode::Escape => {
+                } => {
+                    if key == Keycode::Escape {
                         break 'game_loop;
                     }
-                    Keycode::Num1 => {
-                        chip.key_down(0x1);
+                    if keys.contains_key(&key) {
+                        chip.key_down(keys[&key])
                     }
-                    Keycode::Num2 => {
-                        chip.key_down(0x2);
-                    }
-                    Keycode::Num3 => {
-                        chip.key_down(0x3);
-                    }
-                    Keycode::Num4 => {
-                        chip.key_down(0xC);
-                    }
-                    Keycode::Q => {
-                        chip.key_down(0x4);
-                    }
-                    Keycode::W => {
-                        chip.key_down(0x5);
-                    }
-                    Keycode::E => {
-                        chip.key_down(0x6);
-                    }
-                    Keycode::R => {
-                        chip.key_down(0xD);
-                    }
-                    Keycode::A => {
-                        chip.key_down(0x7);
-                    }
-                    Keycode::S => {
-                        chip.key_down(0x8);
-                    }
-                    Keycode::D => {
-                        chip.key_down(0x9);
-                    }
-                    Keycode::F => {
-                        chip.key_down(0xE);
-                    }
-                    Keycode::Z => {
-                        chip.key_down(0xA);
-                    }
-                    Keycode::X => {
-                        chip.key_down(0x0);
-                    }
-                    Keycode::C => {
-                        chip.key_down(0xB);
-                    }
-                    Keycode::V => {
-                        chip.key_down(0xF);
-                    }
-                    _ => {}
-                },
+                }
                 Event::KeyUp {
                     keycode: Some(key), ..
-                } => match key {
-                    Keycode::Num1 => {
-                        chip.key_up(0x1);
+                } => {
+                    if keys.contains_key(&key) {
+                        chip.key_up(keys[&key])
                     }
-                    Keycode::Num2 => {
-                        chip.key_up(0x2);
-                    }
-                    Keycode::Num3 => {
-                        chip.key_up(0x3);
-                    }
-                    Keycode::Num4 => {
-                        chip.key_up(0xC);
-                    }
-                    Keycode::Q => {
-                        chip.key_up(0x4);
-                    }
-                    Keycode::W => {
-                        chip.key_up(0x5);
-                    }
-                    Keycode::E => {
-                        chip.key_up(0x6);
-                    }
-                    Keycode::R => {
-                        chip.key_up(0xD);
-                    }
-                    Keycode::A => {
-                        chip.key_up(0x7);
-                    }
-                    Keycode::S => {
-                        chip.key_up(0x8);
-                    }
-                    Keycode::D => {
-                        chip.key_up(0x9);
-                    }
-                    Keycode::F => {
-                        chip.key_up(0xE);
-                    }
-                    Keycode::Z => {
-                        chip.key_up(0xA);
-                    }
-                    Keycode::X => {
-                        chip.key_up(0x0);
-                    }
-                    Keycode::C => {
-                        chip.key_up(0xB);
-                    }
-                    Keycode::V => {
-                        chip.key_up(0xF);
-                    }
-                    _ => {}
-                },
+                }
                 Event::Quit { .. } => break 'game_loop,
                 _ => {}
             }
