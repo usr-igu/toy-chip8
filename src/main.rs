@@ -6,7 +6,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
-mod chirp8;
+mod chip8;
 
 fn main() {
     let rom_path = match std::env::args().nth(1) {
@@ -20,7 +20,7 @@ fn main() {
 
     f.read_to_end(&mut buf).unwrap();
 
-    let mut chip = chirp8::new();
+    let mut chip = chip8::new();
 
     chip.load_rom(&buf);
 
