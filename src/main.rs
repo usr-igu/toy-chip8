@@ -24,8 +24,8 @@ fn main() {
 
     chip.load_rom(&buf);
 
-    let window_width = 800;
-    let window_height = 600;
+    let window_width = 64 * 10;
+    let window_height = 32 * 10;
     let block_size = 10u32;
 
     let background_color = Color::RGB(186, 255, 201);
@@ -49,9 +49,6 @@ fn main() {
 
     let cpu_tickrate = std::time::Duration::from_millis(f64::floor((1.0 / 500.0) * 1000.0) as u64);
 
-    // canvas.set_draw_color(background_color);
-    // canvas.clear();
-    // canvas.present();
     'game_loop: loop {
         for event in sdl_context.event_pump().unwrap().poll_iter() {
             match event {
@@ -194,8 +191,8 @@ fn main() {
                     if chip.gfx[i + (j * 64)] != 0 {
                         canvas
                             .fill_rect(Rect::new(
-                                (i * window_width as usize / 64) as i32, // - block_size as i32,
-                                (j * window_height as usize / 32) as i32, //+ block_size as i32,
+                                (i * window_width as usize / 64) as i32,
+                                (j * window_height as usize / 32) as i32,
                                 block_size,
                                 block_size,
                             ))

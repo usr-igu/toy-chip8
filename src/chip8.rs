@@ -14,6 +14,8 @@ pub struct Cpu {
     pub gfx: [u8; 64 * 32],
     pub key_pressed: bool,
     pub draw_flag: bool,
+    load_store_quirk: bool,
+    shift_quirk: bool,
 }
 
 pub fn new() -> Cpu {
@@ -30,6 +32,8 @@ pub fn new() -> Cpu {
         gfx: [0; 64 * 32],
         key_pressed: false,
         draw_flag: false,
+        load_store_quirk: true,
+        shift_quirk: true,
     };
     let chip8_fontset = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -188,12 +192,16 @@ impl Cpu {
                 //8XY6 Store the value of register VY shifted right one bit in register VX
                 //Set register VF to the least significant bit prior to the shift
                 0x06 => {
-                    self.v[0xF] = 0;
                     let x = (opcode & 0x0F00) >> 8;
-                    if (self.v[x as usize]) & 0x1 == 1 {
-                        self.v[0xF] = 1;
+                    if !self.shift_quirk {
+                        let y = (opcode & 0x00F0) >> 4;
+                        self.v[0xF] = self.v[y as usize] & 0x1;
+                        self.v[y as usize] >>= 1;
+                        self.v[x as usize] = self.v[y as usize];
+                    } else {
+                        self.v[0xF] = self.v[x as usize] & 0x1;
+                        self.v[x as usize] >>= 1;
                     }
-                    self.v[x as usize] >>= 1;
                 }
                 //8XY7 Set register VX to the value of VY minus VX
                 //Set VF to 00 if a borrow occurs
@@ -211,13 +219,18 @@ impl Cpu {
                 //8XYE Store the value of register VY shifted left one bit in register VX
                 //Set register VF to the most significant bit prior to the shift
                 0x0E => {
-                    // TODO(fuzzy): Verificar se é necessário modificar VY.
-                    self.v[0xF] = 0;
                     let x = (opcode & 0x0F00) >> 8;
-                    if (self.v[x as usize] >> 7) & 0x1 == 1 {
-                        self.v[0xF] = 1;
+                    if !self.shift_quirk {
+                        if !self.shift_quirk {
+                            let y = (opcode & 0x00F0) >> 4;
+                            self.v[0xF] = (self.v[y as usize] >> 7) & 0x1;
+                            self.v[y as usize] <<= 1;
+                            self.v[x as usize] = self.v[y as usize];
+                        }
+                    } else {
+                        self.v[0xF] = (self.v[x as usize] >> 7) & 0x1;
+                        self.v[x as usize] <<= 1;
                     }
-                    self.v[x as usize] <<= 1;
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
@@ -347,7 +360,9 @@ impl Cpu {
                     for i in 0..x as usize + 1 {
                         self.memory[self.i as usize + i] = self.v[i];
                     }
-                    self.i = self.i + x + 1;
+                    if !self.load_store_quirk {
+                        self.i = self.i + x + 1;
+                    }
                 }
                 //FX65 Fill registers V0 to VX inclusive with the values
                 //stored in memory starting at address I
@@ -357,7 +372,9 @@ impl Cpu {
                     for i in 0..x as usize + 1 {
                         self.v[i] = self.memory[self.i as usize + i];
                     }
-                    self.i = self.i + x + 1;
+                    if !self.load_store_quirk {
+                        self.i = self.i + x + 1;
+                    }
                 }
                 _ => panic!("unknown opcode {:X}", opcode),
             },
