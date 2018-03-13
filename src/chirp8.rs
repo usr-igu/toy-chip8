@@ -1,23 +1,23 @@
 extern crate rand;
 use self::rand::Rng;
 
-pub struct Chip8 {
+pub struct Cpu {
     memory: [u8; 4096],
     v: [u8; 16], // registers
     i: u16,      // address register
     pc: u16,     // program counter
     sp: u8,      // stack pointer
     stack: [u16; 16],
-    delay_timer: u8,
-    sound_timer: u8,
+    pub delay_timer: u8,
+    pub sound_timer: u8,
     keyboard: [u8; 16],
     pub gfx: [u8; 64 * 32],
     pub key_pressed: bool,
     pub draw_flag: bool,
 }
 
-pub fn new() -> Chip8 {
-    let mut chip8 = Chip8 {
+pub fn new() -> Cpu {
+    let mut chip8 = Cpu {
         memory: [0; 4096],
         v: [0; 16],
         i: 0,
@@ -53,7 +53,7 @@ pub fn new() -> Chip8 {
     chip8
 }
 
-impl Chip8 {
+impl Cpu {
     pub fn load_rom(&mut self, rom: &[u8]) {
         self.memory[512..(rom.len() + 512)].clone_from_slice(&rom[..]);
     }
@@ -363,7 +363,6 @@ impl Chip8 {
             },
             _ => panic!("unknown opcode {:X}", opcode),
         }
-
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
         }

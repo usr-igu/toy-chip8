@@ -6,29 +6,35 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
-mod chip8;
+mod chirp8;
 
 fn main() {
-    // let mut f = File::open("test.ch8").unwrap();
-    let mut f = File::open("GAMES/INVADERS").unwrap();
-    // let mut f = File::open("GAMES/MAZE").unwrap();
+    let rom_path = match std::env::args().nth(1) {
+        Some(path) => path,
+        None => panic!("invalid ROM path"),
+    };
+
+    let mut f = File::open(rom_path).unwrap();
 
     let mut buf = Vec::new();
 
     f.read_to_end(&mut buf).unwrap();
 
-    let mut chip = chip8::new();
+    let mut chip = chirp8::new();
 
     chip.load_rom(&buf);
 
     let window_width = 800;
     let window_height = 600;
-    let block_size = 20u32;
+    let block_size = 10u32;
+
+    let background_color = Color::RGB(186, 255, 201);
+    let block_color = Color::RGB(255, 179, 186);
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("rchip", window_width, window_height)
+        .window("chirp8", window_width, window_height)
         .position_centered()
         .build()
         .unwrap();
@@ -37,7 +43,9 @@ fn main() {
 
     let mut old = std::time::Instant::now();
 
-    canvas.set_draw_color(Color::RGB(186, 255, 201));
+    let clock_tick = std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64); // 60hz
+
+    canvas.set_draw_color(background_color);
     canvas.clear();
     canvas.present();
     'game_loop: loop {
@@ -159,16 +167,18 @@ fn main() {
 
         let new = std::time::Instant::now();
 
-        let time = new - old;
+        let tick = new - old;
 
-        if time >= std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64) {
+        // 60hz
+        if tick > clock_tick {
             chip.cycle();
             old = new;
         }
+
         if chip.draw_flag {
-            canvas.set_draw_color(Color::RGB(186, 255, 201));
+            canvas.set_draw_color(background_color);
             canvas.clear();
-            canvas.set_draw_color(Color::RGB(255, 179, 186));
+            canvas.set_draw_color(block_color);
             for j in 0..32 {
                 for i in 0..64 {
                     if chip.gfx[i + (j * 64)] != 0 {

@@ -1,7 +1,7 @@
 [package]
-name = "rchip"
+name = "chirp8"
 version = "0.1.0"
-authors = ["sydy"]
+authors = ["fuzzyqu"]
 
 [dependencies]
 rand = "0.4.2"
