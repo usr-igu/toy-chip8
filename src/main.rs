@@ -1,4 +1,9 @@
+extern crate env_logger;
+#[macro_use]
+extern crate log;
+
 extern crate sdl2;
+
 use std::fs::File;
 use std::io::Read;
 use std::collections::HashMap;
@@ -34,7 +39,10 @@ impl AudioCallback for SoundWave {
 fn main() {
     let rom_path = match std::env::args().nth(1) {
         Some(path) => path,
-        None => panic!("invalid ROM path"),
+        None => {
+            println!("PLEASE GIVE ME A ROM!!");
+            return;
+        }
     };
 
     let mut f = File::open(rom_path).unwrap();
@@ -43,7 +51,11 @@ fn main() {
 
     f.read_to_end(&mut buf).unwrap();
 
+    env_logger::init();
+
     let mut chip = chip8::new();
+
+    chip.toogle_quirks();
 
     chip.load_rom(&buf);
 
@@ -72,7 +84,7 @@ fn main() {
         .open_playback(None, &desired_spec, |spec| SoundWave {
             phase_inc: 60.0 / spec.freq as f32,
             phase: 0.5,
-            volume: 0.25,
+            volume: 0.10,
         })
         .unwrap();
 
