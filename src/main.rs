@@ -55,7 +55,7 @@ fn main() {
 
     let mut chip = chip8::new();
 
-    chip.toogle_quirks();
+    // chip.toogle_quirks();
 
     chip.load_rom(&buf);
 
@@ -89,6 +89,9 @@ fn main() {
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
+
+    canvas.set_draw_color(background_color);
+    canvas.clear();
 
     let timers_tickrate =
         std::time::Duration::from_millis(f64::floor((1.0 / 60.0) * 1000.0) as u64); // 60hz

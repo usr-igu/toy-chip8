@@ -2,6 +2,7 @@
 name = "chip8"
 version = "0.1.0"
 authors = ["quasar343"]
+build = "build.rs"
 
 [dependencies]
 rand = "0.4.2"
