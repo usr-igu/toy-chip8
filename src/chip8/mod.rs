@@ -300,7 +300,7 @@ impl Cpu {
     fn op_00ee(&mut self) {
         self.sp -= 1; // go down the stack
         self.pc = self.stack[self.sp as usize]; // return from the routine
-        debug!("RET")
+        debug!("RET to addr({})", self.pc);
     }
     // Jump to address NNN
     fn op_1nnn(&mut self, nnn: u16) {

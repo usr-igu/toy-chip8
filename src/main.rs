@@ -55,7 +55,7 @@ fn main() {
 
     let mut chip = chip8::new();
 
-    // chip.toogle_quirks();
+    chip.toogle_quirks();
 
     chip.load_rom(&buf);
 
