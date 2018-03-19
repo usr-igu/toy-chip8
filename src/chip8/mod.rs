@@ -55,7 +55,8 @@ pub fn new() -> Cpu {
             0xE0, 0x90, 0x90, 0x90, 0xE0, //D
             0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
             0xF0, 0x80, 0xF0, 0x80, 0x80]; //F
-                                           // load fontset
+
+    // load fontset
     chip8.memory[..chip8_fontset.len()].clone_from_slice(&chip8_fontset[..]);
     chip8
 }
@@ -86,156 +87,31 @@ impl Cpu {
         let n = opcode & 0x000F;
         let nn = opcode & 0x00FF;
         let nnn = opcode & 0x0FFF;
+
         match opcode & 0xF000 {
-            0x0000 => {
-                match opcode & 0x00FF {
-                    //0000 Execute machine language subroutine at address NNN
-                    // 0x00 => panic!("unknown opcode {:X}", opcode), // TODO(fuzzyqu)
-                    //00E0 Clear the screen
-                    0xE0 => {
-                        for i in 0..self.gfx.len() {
-                            self.gfx[i] = 0;
-                        }
-                        self.draw_flag = true;
-                        debug!("CLS");
-                    }
-                    //00EE Return from a subroutine
-                    0xEE => {
-                        self.sp -= 1; // go down the stack
-                        self.pc = self.stack[self.sp as usize]; // return from the routine
-                        debug!("RET")
-                    }
-                    _ => panic!("unknown opcode {:X}", opcode),
-                }
-            }
-            //1NNN Jump to address NNN
-            0x1000 => {
-                debug!("JP addr({})", nnn);
-                self.pc = nnn;
-            }
-            //2NNN Execute subroutine starting at address NNN
-            0x2000 => {
-                debug!("CALL addr{}", nnn);
-                self.stack[self.sp as usize] = self.pc;
-                self.sp += 1;
-                self.pc = nnn;
-            }
-            //3XNN Skip the following instruction if the value of register VX equals NN
-            0x3000 => {
-                debug!("SE V[{}] byte({})", x, nn);
-                if self.v[x as usize] == nn as u8 {
-                    self.pc += 2;
-                }
-            }
-            //4XNN Skip the following instruction if the value of register VX is not equal to NN
-            0x4000 => {
-                debug!("SNE V[{}], byte({})", x, nn);
-                if self.v[x as usize] != nn as u8 {
-                    self.pc += 2;
-                }
-            }
-            //5XY0 Skip the following instruction if the value of register VX is equal to the value of register VY
-            0x5000 => {
-                debug!("SE V[{}], V[{}]", x, y);
-                if self.v[x as usize] == self.v[y as usize] {
-                    self.pc += 2;
-                }
-            }
-            //6XNN Store number NN in register VX
-            0x6000 => {
-                debug!("LD V[{}], byte({})", x, nn);
-                self.v[x as usize] = nn as u8;
-            }
-            //7XNN Add the value NN to register VX
-            0x7000 => {
-                debug!("ADD V[{}], byte({})", x, nn);
-                self.v[x as usize] = self.v[x as usize].wrapping_add(nn as u8);
-            }
+            0x0000 => match opcode & 0x00FF {
+                0x00 => self.op_0nnn(nnn),
+                0xE0 => self.op_00e0(),
+                0xEE => self.op_00ee(),
+                _ => panic!("unknown opcode {:X}", opcode),
+            },
+            0x1000 => self.op_1nnn(nnn),
+            0x2000 => self.op_2nnn(nnn),
+            0x3000 => self.op_3xnn(x, nn),
+            0x4000 => self.op_4xnn(x, nn),
+            0x5000 => self.op_5xy0(x, y),
+            0x6000 => self.op_6xnn(x, nn),
+            0x7000 => self.op_7xnn(x, nn),
             0x8000 => match opcode & 0x000F {
-                //8XY0 Store the value of register VY in register VX
-                0x0 => {
-                    debug!("LD V[{}], V[{}]", x, y);
-                    self.v[x as usize] = self.v[y as usize];
-                }
-                //8XY1 Set VX to VX OR VY
-                0x1 => {
-                    debug!("OR V[{}], V[{}]", x, y);
-                    self.v[x as usize] |= self.v[y as usize];
-                }
-                //8XY2 Set VX to VX AND VY
-                0x2 => {
-                    debug!("AND V[{}], V[{}]", x, y);
-                    self.v[x as usize] &= self.v[y as usize];
-                }
-                //8XY3 Set VX to VX XOR VY
-                0x3 => {
-                    debug!("XOR V[{}], V[{}]", x, y);
-                    self.v[x as usize] ^= self.v[y as usize];
-                }
-                //8XY4 Add the value of register VY to register VX
-                //Set VF to 01 if a carry occurs
-                //Set VF to 00 if a carry does not occur
-                0x04 => {
-                    debug!("ADD V[{}], V[{}]", x, y);
-                    self.v[0xF] = 0;
-                    let (sum, carry) = self.v[x as usize].overflowing_add(self.v[y as usize]);
-                    if carry {
-                        self.v[0xF] = 1
-                    };
-                    self.v[x as usize] = sum;
-                }
-                //8XY5 Subtract the value of register VY from register VX
-                //Set VF to 00 if a borrow occurs
-                //Set VF to 01 if a borrow does not occur
-                0x05 => {
-                    debug!("SUB V[{}], V[{}]", x, y);
-                    self.v[0xF] = 1;
-                    let (sub, borrow) = self.v[x as usize].overflowing_sub(self.v[y as usize]);
-                    if borrow {
-                        self.v[0xF] = 0
-                    };
-                    self.v[x as usize] = sub;
-                }
-                //8XY6 Store the value of register VY shifted right one bit in register VX
-                //Set register VF to the least significant bit prior to the shift
-                0x06 => {
-                    debug!("SHR V[{}] {{, V[{}]}}", x, y);
-                    if !self.shift_quirk {
-                        self.v[0xF] = self.v[y as usize] & 0x1;
-                        self.v[y as usize] >>= 1;
-                        self.v[x as usize] = self.v[y as usize];
-                    } else {
-                        self.v[0xF] = self.v[x as usize] & 0x1;
-                        self.v[x as usize] >>= 1;
-                    }
-                }
-                //8XY7 Set register VX to the value of VY minus VX
-                //Set VF to 00 if a borrow occurs
-                //Set VF to 01 if a borrow does not occur
-                0x07 => {
-                    debug!("SUBN V[{}], V[{}]", x, y);
-                    self.v[0xF] = 1;
-                    let (sub, borrow) = self.v[y as usize].overflowing_sub(self.v[x as usize]);
-                    if borrow {
-                        self.v[0xF] = 0
-                    };
-                    self.v[x as usize] = sub;
-                }
-                //8XYE Store the value of register VY shifted left one bit in register VX
-                //Set register VF to the most significant bit prior to the shift
-                0x0E => {
-                    debug!("SHL V[{}] {{, V[{}]}}", x, y);
-                    if !self.shift_quirk {
-                        if !self.shift_quirk {
-                            self.v[0xF] = (self.v[y as usize] >> 7) & 0x1;
-                            self.v[y as usize] <<= 1;
-                            self.v[x as usize] = self.v[y as usize];
-                        }
-                    } else {
-                        self.v[0xF] = (self.v[x as usize] >> 7) & 0x1;
-                        self.v[x as usize] <<= 1;
-                    }
-                }
+                0x0 => self.op_8xy0(x, y),
+                0x1 => self.op_8xy1(x, y),
+                0x2 => self.op_8xy2(x, y),
+                0x3 => self.op_8xy3(x, y),
+                0x04 => self.op_8xy4(x, y),
+                0x05 => self.op_8xy5(x, y),
+                0x06 => self.op_8xy6(x, y),
+                0x07 => self.op_8xy7(x, y),
+                0x0E => self.op_8xye(x, y),
                 _ => panic!("unknown opcode {:X}", opcode),
             },
             //9XY0 Skip the following instruction if the value of register VX
@@ -403,5 +279,164 @@ impl Cpu {
     pub fn toogle_quirks(&mut self) {
         self.load_store_quirk = !self.load_store_quirk;
         self.shift_quirk = !self.shift_quirk;
+    }
+
+    // Jump to a machine code routine at nnn.
+    // This instruction is only used on the old computers on which Chip-8 was originally implemented. It is ignored by modern interpreters.
+    fn op_0nnn(&mut self, nnn: u16) {
+        debug!("SYS addr({})", nnn);
+        unimplemented!();
+    }
+
+    // Clear the display
+    fn op_00e0(&mut self) {
+        for i in 0..self.gfx.len() {
+            self.gfx[i] = 0;
+        }
+        self.draw_flag = true;
+        debug!("CLS");
+    }
+    // Return from a subroutine
+    fn op_00ee(&mut self) {
+        self.sp -= 1; // go down the stack
+        self.pc = self.stack[self.sp as usize]; // return from the routine
+        debug!("RET")
+    }
+    // Jump to address NNN
+    fn op_1nnn(&mut self, nnn: u16) {
+        debug!("JP addr({})", nnn);
+        self.pc = nnn;
+    }
+    // Execute subroutine starting at address NNN
+    fn op_2nnn(&mut self, nnn: u16) {
+        debug!("CALL addr{}", nnn);
+        self.stack[self.sp as usize] = self.pc;
+        self.sp += 1;
+        self.pc = nnn;
+    }
+    // Skip the following instruction if the value of register VX equals NN
+    fn op_3xnn(&mut self, x: u16, nn: u16) {
+        debug!("SE V[{}] byte({})", x, nn);
+        if self.v[x as usize] == nn as u8 {
+            self.pc += 2;
+        }
+    }
+    // Skip the following instruction if the value of register VX is not equal to NN
+    fn op_4xnn(&mut self, x: u16, nn: u16) {
+        debug!("SNE V[{}], byte({})", x, nn);
+        if self.v[x as usize] != nn as u8 {
+            self.pc += 2;
+        }
+    }
+    // Skip the following instruction if the value of register VX is equal to the value of register VY
+    fn op_5xy0(&mut self, x: u16, y: u16) {
+        debug!("SE V[{}], V[{}]", x, y);
+        if self.v[x as usize] == self.v[y as usize] {
+            self.pc += 2;
+        }
+    }
+    // Store number NN in register VX
+    fn op_6xnn(&mut self, x: u16, nn: u16) {
+        debug!("LD V[{}], byte({})", x, nn);
+        self.v[x as usize] = nn as u8;
+    }
+    // Add the value NN to register VX
+    fn op_7xnn(&mut self, x: u16, nn: u16) {
+        debug!("ADD V[{}], byte({})", x, nn);
+        self.v[x as usize] = self.v[x as usize].wrapping_add(nn as u8);
+    }
+
+    // MATH STUFF
+    // Store the value of register VY in register VX
+    fn op_8xy0(&mut self, x: u16, y: u16) {
+        debug!("LD V[{}], V[{}]", x, y);
+        self.v[x as usize] = self.v[y as usize];
+    }
+
+    // Set VX to VX OR VY
+    fn op_8xy1(&mut self, x: u16, y: u16) {
+        debug!("OR V[{}], V[{}]", x, y);
+        self.v[x as usize] |= self.v[y as usize];
+    }
+
+    // Set VX to VX AND VY
+    fn op_8xy2(&mut self, x: u16, y: u16) {
+        debug!("AND V[{}], V[{}]", x, y);
+        self.v[x as usize] &= self.v[y as usize];
+    }
+
+    // Set VX to VX XOR VY
+    fn op_8xy3(&mut self, x: u16, y: u16) {
+        debug!("XOR V[{}], V[{}]", x, y);
+        self.v[x as usize] ^= self.v[y as usize];
+    }
+
+    // Add the value of register VY to register VX
+    // Set VF to 01 if a carry occurs
+    // Set VF to 00 if a carry does not occur
+    fn op_8xy4(&mut self, x: u16, y: u16) {
+        debug!("ADD V[{}], V[{}]", x, y);
+        self.v[0xF] = 0;
+        let (sum, carry) = self.v[x as usize].overflowing_add(self.v[y as usize]);
+        if carry {
+            self.v[0xF] = 1
+        };
+        self.v[x as usize] = sum;
+    }
+
+    // Subtract the value of register VY from register VX
+    // Set VF to 00 if a borrow occurs
+    // Set VF to 01 if a borrow does not occur
+    fn op_8xy5(&mut self, x: u16, y: u16) {
+        debug!("SUB V[{}], V[{}]", x, y);
+        self.v[0xF] = 1;
+        let (sub, borrow) = self.v[x as usize].overflowing_sub(self.v[y as usize]);
+        if borrow {
+            self.v[0xF] = 0
+        };
+        self.v[x as usize] = sub;
+    }
+
+    // Store the value of register VY shifted right one bit in register VX
+    // Set register VF to the least significant bit prior to the shift
+    fn op_8xy6(&mut self, x: u16, y: u16) {
+        debug!("SHR V[{}] {{, V[{}]}}", x, y);
+        if !self.shift_quirk {
+            self.v[0xF] = self.v[y as usize] & 0x1;
+            self.v[y as usize] >>= 1;
+            self.v[x as usize] = self.v[y as usize];
+        } else {
+            self.v[0xF] = self.v[x as usize] & 0x1;
+            self.v[x as usize] >>= 1;
+        }
+    }
+
+    // Set register VX to the value of VY minus VX
+    // Set VF to 00 if a borrow occurs
+    // Set VF to 01 if a borrow does not occur
+    fn op_8xy7(&mut self, x: u16, y: u16) {
+        debug!("SUBN V[{}], V[{}]", x, y);
+        self.v[0xF] = 1;
+        let (sub, borrow) = self.v[y as usize].overflowing_sub(self.v[x as usize]);
+        if borrow {
+            self.v[0xF] = 0
+        };
+        self.v[x as usize] = sub;
+    }
+
+    //8XYE Store the value of register VY shifted left one bit in register VX
+    //Set register VF to the most significant bit prior to the shift
+    fn op_8xye(&mut self, x: u16, y: u16) {
+        debug!("SHL V[{}] {{, V[{}]}}", x, y);
+        if !self.shift_quirk {
+            if !self.shift_quirk {
+                self.v[0xF] = (self.v[y as usize] >> 7) & 0x1;
+                self.v[y as usize] <<= 1;
+                self.v[x as usize] = self.v[y as usize];
+            }
+        } else {
+            self.v[0xF] = (self.v[x as usize] >> 7) & 0x1;
+            self.v[x as usize] <<= 1;
+        }
     }
 }

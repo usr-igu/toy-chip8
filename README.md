@@ -7,7 +7,6 @@ Alguns jogos vão precisar que as flags de _quirks_ estejam ativadas.
 Screenshots:
 ![space invaders](screenshots/space1.png)
 
-
 ![space invaders](screenshots/space2.png)
 
 ![tic tac](screenshots/tictac.png)

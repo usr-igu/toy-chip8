@@ -1,4 +1,5 @@
-/target
+target/
+roms/
 **/*.rs.bk
 .vscode/
 *.dll

@@ -7,7 +7,7 @@ extern crate sdl2;
 use std::fs::File;
 use std::io::Read;
 use std::collections::HashMap;
-
+use std::iter::FromIterator;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -63,6 +63,7 @@ fn main() {
     let window_height = 32 * 15;
     let block_size = 15u32;
 
+    // Facebook colors, lol
     let background_color = Color::RGB(59, 89, 152);
     let block_color = Color::RGB(247, 247, 247);
 
@@ -101,23 +102,24 @@ fn main() {
     let mut timers_past = std::time::Instant::now();
     let mut cpu_past = std::time::Instant::now();
 
-    let mut keys = HashMap::new();
-    keys.insert(Keycode::Num1, 0x1);
-    keys.insert(Keycode::Num2, 0x2);
-    keys.insert(Keycode::Num3, 0x3);
-    keys.insert(Keycode::Num4, 0xC);
-    keys.insert(Keycode::Q, 0x4);
-    keys.insert(Keycode::W, 0x5);
-    keys.insert(Keycode::E, 0x6);
-    keys.insert(Keycode::R, 0xD);
-    keys.insert(Keycode::A, 0x7);
-    keys.insert(Keycode::S, 0x8);
-    keys.insert(Keycode::D, 0x9);
-    keys.insert(Keycode::F, 0xE);
-    keys.insert(Keycode::Z, 0xA);
-    keys.insert(Keycode::X, 0x0);
-    keys.insert(Keycode::C, 0xB);
-    keys.insert(Keycode::V, 0xF);
+    let keys: HashMap<Keycode, u8> = HashMap::from_iter(vec![
+        (Keycode::Num1, 0x1),
+        (Keycode::Num2, 0x2),
+        (Keycode::Num3, 0x3),
+        (Keycode::Num4, 0xC),
+        (Keycode::Q, 0x4),
+        (Keycode::W, 0x5),
+        (Keycode::E, 0x6),
+        (Keycode::R, 0xD),
+        (Keycode::A, 0x7),
+        (Keycode::S, 0x8),
+        (Keycode::D, 0x9),
+        (Keycode::F, 0xE),
+        (Keycode::Z, 0xA),
+        (Keycode::X, 0x0),
+        (Keycode::C, 0xB),
+        (Keycode::V, 0xF),
+    ]);
 
     'game_loop: loop {
         for event in sdl_context.event_pump().unwrap().poll_iter() {
